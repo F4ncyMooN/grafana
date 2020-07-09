@@ -13,5 +13,6 @@ require (
 	github.com/urfave/cli v1.20.0 // indirect
 	golang.org/x/sys v0.0.0-20200622214017-ed371f2e16b4 // indirect
 	golang.org/x/tools v0.0.0-20200624225443-88f3c62a19ff // indirect
+	google.golang.org/appengine v1.4.0 // indirect
 	gopkg.in/fsnotify/fsnotify.v1 v1.4.7 // indirect
 )

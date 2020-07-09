@@ -7,6 +7,7 @@ import { seriesToFieldsTransformerRegistryItem } from '../components/Transformer
 import { calculateFieldTransformRegistryItem } from '../components/TransformersUI/CalculateFieldTransformerEditor';
 import { labelsToFieldsTransformerRegistryItem } from '../components/TransformersUI/LabelsToFieldsTransformerEditor';
 import { mergeTransformerRegistryItem } from '../components/TransformersUI/MergeTransformerEditor';
+import { fullJoinTransformerRegistryItem } from '../components/TransformersUI/FullJoinFieldsTransformerEditor';
 
 export const getStandardTransformers = (): Array<TransformerRegistyItem<any>> => {
   return [
@@ -18,5 +19,6 @@ export const getStandardTransformers = (): Array<TransformerRegistyItem<any>> =>
     calculateFieldTransformRegistryItem,
     labelsToFieldsTransformerRegistryItem,
     mergeTransformerRegistryItem,
+    fullJoinTransformerRegistryItem,
   ];
 };
