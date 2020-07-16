@@ -6,6 +6,7 @@ import {
   TransformerRegistyItem,
   TransformerUIProps,
 } from '@grafana/data';
+import isArray from 'lodash/isArray';
 import { getAllFieldNamesFromDataFrames } from './OrganizeFieldsTransformerEditor';
 import { Select } from '@grafana/ui';
 
@@ -20,10 +21,10 @@ export const FullJoinFieldsTransformerEditor: React.FC<TransformerUIProps<FullJo
   const fieldNameOptions = fieldNames.map((item: string) => ({ label: item, value: item }));
 
   const onSelectField = useCallback(
-    (value: SelectableValue<string>) => {
+    (item: SelectableValue<string>) => {
       onChange({
         ...options,
-        byField: value.value,
+        byFields: isArray(item) ? item.map(v => v.value) : item && item.value ? [item.value] : [],
       });
     },
     [onChange, options]
@@ -34,8 +35,9 @@ export const FullJoinFieldsTransformerEditor: React.FC<TransformerUIProps<FullJo
       <div className="gf-form gf-form--grow">
         <div className="gf-form-label width-8">Field name</div>
         <Select
+          isMulti
           options={fieldNameOptions}
-          value={options.byField}
+          value={options.byFields}
           onChange={onSelectField}
           isClearable
           menuPlacement="bottom"
