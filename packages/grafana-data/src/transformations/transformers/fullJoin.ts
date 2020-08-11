@@ -75,7 +75,7 @@ function findMatchedIndex(df: DataFrame, kvs: { [key: string]: any }) {
   return intersection(...idx);
 }
 
-function joinDataFrame(prev: MutableDataFrame, now: MutableDataFrame, on: string[]): MutableDataFrame {
+function joinDataFrame(prev: DataFrame, now: DataFrame, on: string[]): DataFrame {
   if (prev.length === 0) {
     // deep clone
     return new MutableDataFrame(now);
@@ -132,7 +132,7 @@ function joinDataFrame(prev: MutableDataFrame, now: MutableDataFrame, on: string
     if (!field) {
       continue;
     }
-    prev.addField({
+    (prev as MutableDataFrame).addField({
       name: field.name,
       config: field.config,
       type: field.type,
