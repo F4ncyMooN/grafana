@@ -13,6 +13,7 @@ import { labelsToFieldsTransformer } from './transformers/labelsToFields';
 import { ensureColumnsTransformer } from './transformers/ensureColumns';
 import { mergeTransformer } from './transformers/merge/merge';
 import { fullJoinTransformer } from './transformers/fullJoin';
+import { mappingTransformer } from './transformers/mapping';
 
 export const standardTransformers = {
   noopTransformer,
@@ -31,4 +32,5 @@ export const standardTransformers = {
   ensureColumnsTransformer,
   mergeTransformer,
   fullJoinTransformer,
+  mappingTransformer,
 };

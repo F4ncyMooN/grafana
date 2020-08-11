@@ -10,6 +10,7 @@ export enum DataTransformerID {
   seriesToColumns = 'seriesToColumns',
   seriesToRows = 'seriesToRows',
   fullJoin = 'fullJoin',
+  mapping = 'mapping',
   merge = 'merge',
   labelsToFields = 'labelsToFields',
   filterFields = 'filterFields',

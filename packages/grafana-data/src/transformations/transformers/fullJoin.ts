@@ -7,10 +7,6 @@ export interface FullJoinOptions {
   byFields?: string[];
 }
 
-interface Dimension {
-  keys: string[];
-  vals: string[];
-}
 interface Table {
   [key: string]: any[];
 }
@@ -26,225 +22,127 @@ export const fullJoinTransformer: DataTransformerInfo<FullJoinOptions> = {
   },
   transformer: options => (data: DataFrame[]) => {
     const keyFields = options.byFields || DEFAULT_KEY_FIELD;
-    const dimMap: { [key: string]: { dim: Dimension; times: number } } = {};
-
-    // check each frame has all join fields
-    for (let frameIndex = 0; frameIndex < data.length; frameIndex++) {
-      const frame = data[frameIndex];
-      const dims: Field[] = [];
-      for (let fieldIndex = 0; fieldIndex < keyFields.length; fieldIndex++) {
-        const field = findKeyField(frame, keyFields[fieldIndex]);
-        if (!field) {
-          return data;
-        }
-        dims.push(field);
-      }
-      const dimensions = getDimensionSets(dims);
-      for (const d of dimensions) {
-        const key = d.vals.join(',');
-        if (key in dimMap) {
-          dimMap[key].times += 1;
-          continue;
-        }
-        dimMap[key] = {
-          dim: d,
-          times: 1,
-        };
-      }
-    }
-
-    const joinedDimentionSet: Dimension[] = [];
-    Object.keys(dimMap).forEach(key => {
-      const element = dimMap[key];
-      if (element.times === data.length) {
-        joinedDimentionSet.push(element.dim);
-      }
-    });
 
     const resultFrame = new MutableDataFrame();
     const df = data.reduce((prev, now) => {
-      return joinDataFrame(prev, now, joinedDimentionSet);
+      return joinDataFrame(prev, now, keyFields);
     }, resultFrame);
 
     return [df];
   },
 };
 
-function getDimensionSets(fields: Field[]): Dimension[] {
-  const dims: Dimension[] = [];
-  let maxLen = 0;
-  for (const f of fields) {
-    if (f.values.length > maxLen) {
-      maxLen = f.values.length;
-    }
+function intersection<T>(...datum: T[][]): T[] {
+  if (!datum || datum.length === 0) {
+    return [];
   }
-  const mp: { [key: string]: number } = {};
-  for (let i = 0; i < maxLen; i++) {
-    let keys: string[] = [];
-    let vals: string[] = [];
-    for (const f of fields) {
-      const k = f.name;
-      const v = f.values.get(i);
-      keys.push(k);
-      vals.push(v ? v : '');
+  return datum.reduce((prev: T[], now: T[]) => {
+    if (prev === null || prev === undefined) {
+      return now;
     }
-    if (vals.join(',') in mp) {
-      continue;
-    }
-    dims.push({
-      keys: keys,
-      vals: vals,
-    });
-    mp[vals.join(',')] = 1;
-  }
-  return dims;
-}
-
-function getFieldSize(fields: Field[]): number {
-  for (const f of fields) {
-    return f.values.length;
-  }
-  return 0;
-}
-
-function matchDimension(df: DataFrame, dimension: Dimension, index: number): boolean {
-  let allMatch = true;
-  for (let i = 0; i < dimension.keys.length; i++) {
-    for (const field of df.fields) {
-      if (field.name === dimension.keys[i] && field.values.get(index) !== dimension.vals[i]) {
-        return false;
-      }
-    }
-  }
-  return allMatch;
-}
-
-function findMatchedFields(df: DataFrame, dimension: Dimension): Table {
-  const fields: Table = {};
-  df.fields.forEach(field => (fields[field.name] = []));
-  const size = getFieldSize(df.fields);
-  for (let i = 0; i < size; i++) {
-    if (matchDimension(df, dimension, i)) {
-      for (const field of df.fields) {
-        fields[field.name].push(field.values.get(i));
-      }
-    }
-  }
-  return fields;
-}
-
-function expansion(table: Table, factor: number): Table {
-  if (factor <= 1) {
-    return table;
-  }
-  Object.keys(table).forEach(key => {
-    const old = table[key];
-    const values: any[] = [];
-
-    for (let i = 0; i < factor; i++) {
-      for (const v of old) {
-        values.push(v);
-      }
-    }
-    table[key] = values;
+    return prev.filter(d => now.indexOf(d) > -1);
   });
-
-  return table;
+}
+function union<T>(...datum: T[][]): T[] {
+  if (!datum || datum.length === 0) {
+    return [];
+  }
+  return datum.reduce((prev: T[], now: T[]) => {
+    return prev.concat(now.filter(v => !(prev.indexOf(v) > -1)));
+  }, []);
 }
 
-function tableLength(table: Table): number {
-  for (const key of Object.keys(table)) {
-    return table[key].length;
+function rowSize(df: DataFrame): number {
+  for (const field of df.fields) {
+    return field.values.length;
   }
   return 0;
 }
-
-function gcd(num1: number, num2: number): number {
-  if (num1 === 0 || num2 === 0) {
-    return 0;
-  }
-  if (num1 === num2) {
-    return num1;
-  }
-  while (num2) {
-    var t = num2;
-    num2 = num1 % num2;
-    num1 = t;
-  }
-  return num1;
+function findMatchedIndex(df: DataFrame, kvs: { [key: string]: any }) {
+  const idx: number[][] = [];
+  df.fields.forEach(field => {
+    if (field.name in kvs) {
+      const vals = field.values;
+      const matchedIndex: number[] = [];
+      for (let i = 0; i < vals.length; i++) {
+        if (vals.get(i) === kvs[field.name]) {
+          matchedIndex.push(i);
+        }
+      }
+      idx.push(matchedIndex);
+    }
+  });
+  return intersection(...idx);
 }
 
-function mergeTable(left: Table, right: Table): Table {
-  let leftSize = tableLength(left);
-  let rightSize = tableLength(right);
-  const factor = gcd(leftSize, rightSize);
-  leftSize /= factor;
-  rightSize /= factor;
-  left = expansion(left, rightSize);
-  right = expansion(right, leftSize);
-  // FIX? need to dedupe?
-  for (const key of Object.keys(right)) {
-    left[key] = right[key];
-  }
-  return left;
-}
-
-function joinDataFrame(prev: DataFrame, now: DataFrame, dims: Dimension[]): DataFrame {
+function joinDataFrame(prev: MutableDataFrame, now: MutableDataFrame, on: string[]): MutableDataFrame {
   if (prev.length === 0) {
     // deep clone
-    const newFrame = new MutableDataFrame();
-    for (const field of now.fields) {
-      const values = field.values.toArray();
-      newFrame.addField({
-        ...field,
-        values: new ArrayVector(values),
-      });
-    }
-    return newFrame;
+    return new MutableDataFrame(now);
   }
+  // console.log('before merge', prev);
   // assume all fields' values have same length.
+  const prevFields = prev.fields.map(v => v.name);
+  const nowFields = now.fields.map(v => v.name);
+
+  const keys = intersection(on, prevFields, nowFields);
+  // console.log(keys, prevFields, nowFields, on);
   const final: Table = {};
-  for (const dimension of dims) {
-    const left = findMatchedFields(prev, dimension);
-    const right = findMatchedFields(now, dimension);
-    const newTable = mergeTable(left, right);
-    for (const key of Object.keys(newTable)) {
-      if (key in final) {
-        final[key] = final[key].concat(newTable[key]);
-      } else {
-        final[key] = newTable[key];
+  const length = rowSize(prev);
+  union(prevFields, nowFields).forEach(key => (final[key] = []));
+
+  for (let i = 0; i < length; i++) {
+    const kvs: { [key: string]: any } = {};
+    prev.fields.forEach(field => {
+      if (keys.includes(field.name)) {
+        kvs[field.name] = field.values.get(i);
+      }
+    });
+    const matchedIndex = findMatchedIndex(now, kvs);
+    // console.log('matched index', kvs, matchedIndex);
+    if (matchedIndex.length === 0) {
+      continue;
+    }
+    // put driver table fields into new table
+    for (const key of prevFields) {
+      const field = findKeyField(prev, key);
+      if (field != null) {
+        final[key].push(field.values.get(i));
       }
     }
+    // put target table fields into new table
+    matchedIndex.forEach(j => {
+      for (const key of nowFields) {
+        const field = findKeyField(now, key);
+        // if some field is duplicated, only use left
+        if (field != null && !prevFields.includes(key)) {
+          final[key].push(field.values.get(j));
+        }
+      }
+    });
   }
-  // console.log(final)
+
+  // console.log(final);
   for (const key of Object.keys(final)) {
-    let found = false;
-    for (const field of prev.fields) {
-      if (field.name === key) {
-        field.values = new ArrayVector(final[key]);
-        found = true;
-      }
-    }
-    if (found) {
+    if (findKeyField(prev, key) !== null) {
       continue;
     }
     // console.log('add new', key)
-    const field = now.fields.find(field => field.name === key);
+    const field = findKeyField(now, key);
     if (!field) {
       continue;
     }
-    prev.fields.push({
-      ...field,
+    prev.addField({
       name: field.name,
       config: field.config,
       type: field.type,
-      values: new ArrayVector(final[key]),
+      values: new ArrayVector(),
     });
   }
   for (const field of prev.fields) {
     field.values = new ArrayVector(final[field.name]);
   }
-  // console.log('after merge', prev)
+  // console.log('after merge', prev);
   return prev;
 }
 
